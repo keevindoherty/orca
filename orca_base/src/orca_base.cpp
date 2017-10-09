@@ -1,4 +1,5 @@
 #include <std_msgs/Bool.h>
+
 #include "orca_base/orca_util.h"
 #include "orca_base/orca_base.h"
 #include "orca_base/Camera.h"
@@ -53,6 +54,19 @@
 // Publish messages at 100Hz
 #define SPIN_RATE 100
 
+// Covariance for /odom messages. We assume that roll and pitch are fixed.
+// TODO covariance for depth might also be MAX_DBL???
+static const double MAX_DBL = std::numeric_limits<double>::max();
+static const double COVARIANCE[36] =
+{
+  1e-5,    1e-5,    1e-5,    0.0,     0.0,     1e-5,
+  1e-5,    1e-5,    1e-5,    0.0,     0.0,     1e-5,
+  1e-5,    1e-5,    1e-5,    0.0,     0.0,     1e-5,
+  0.0,     0.0,     0.0,     MAX_DBL, 0.0,     0.0,
+  0.0,     0.0,     0.0,     0.0,     MAX_DBL, 0.0,
+  1e-5,    1e-5,    1e-5,    0.0,     0.0,     1e-5
+};
+
 namespace orca_base {
 
 OrcaBase::OrcaBase(ros::NodeHandle &nh, tf::TransformListener &tf):
@@ -85,6 +99,16 @@ OrcaBase::OrcaBase(ros::NodeHandle &nh, tf::TransformListener &tf):
   depth_pid_enable_pub_ = nh_.advertise<std_msgs::Bool>("/depth_pid_enable", 1);
   depth_state_pub_ = nh_.advertise<std_msgs::Float64>("/depth_state", 1);
   depth_setpoint_pub_ = nh_.advertise<std_msgs::Float64>("/depth_setpoint", 1);
+  odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/odom", 1);
+
+  // Prepopulate odom message
+  odom_msg_.header.frame_id = "odom";
+  odom_msg_.child_frame_id = "base_link";
+  for (int i = 0; i < 36; i++)
+  {
+    odom_msg_.pose.covariance[i] = COVARIANCE[i];
+    odom_msg_.twist.covariance[i] = COVARIANCE[i];
+  }
 }
 
 // New depth reading
@@ -149,6 +173,63 @@ void OrcaBase::publishLights()
   orca_base::Lights msg;
   msg.brightness = lights_;
   lights_pub_.publish(msg);
+}
+
+void OrcaBase::publishOdom()
+{
+  odom_msg_.header.stamp = ros::Time::now();
+
+  // Publish a niave odom based on thrust effort and depth.
+  //
+  // BlueROV2 specs: http://docs.bluerobotics.com/brov2/
+  // T200 specs: http://docs.bluerobotics.com/thrusters/t200/
+  //
+  // Drag equation (The ROV Manual, Christ and Wernli, pp82-84):
+  //    drag = 1/2 * sigma * area * velocity^2 * drag_coefficient
+  //    sigma = density of seawater / gravitional_accel = 1035 kg/m^3 / 9.8 m/s^2 = 105.6
+  //    area = cross-sectional area facing direction of motion
+  //    drag_coefficient = 0.9 for the ROV, and 1.2 for the unfaired tether
+  //
+  // Simplifying assumptions:
+  //    thrust force ~= PWM ~= effort
+  //    tether drag in xy ~= depth
+  //    ignore acceleration, so thrust force == drag force
+  //    cross-sectional area is the same for forward and lateral thrust, and constant during rotations
+  //    voltage = 16V
+  //
+  // TODO monitor voltage
+  // TODO modify drag equation for rotation
+
+  #define SIGMA 105.6
+  #define ROV_AREA 0.0859
+  #define ROV_DRAG_COEF 0.9
+  #define TETHER_DIAM 0.008
+  #define TETHER_DRAG_COEF 1.2
+  #define MAX_THRUST_XY 14 // Forward and lateral bollard thrust
+
+  // Thrust force
+  // TODO calc yaw force
+  double thrust_force_x = MAX_THRUST_XY * strafe_effort_;
+  double thrust_force_y = MAX_THRUST_XY * forward_effort_;
+  // double thrust_force_yaw = MAX_THRUST_YAW * yaw_effort_;
+  
+  // Velocity
+  // TODO handle tethered case
+  // TODO calc depth velocity
+  odom_msg_.twist.twist.linear.x = sqrt(thrust_force_x * 2 / SIGMA / ROV_AREA / ROV_DRAG_COEF);
+  odom_msg_.twist.twist.linear.y = sqrt(thrust_force_y * 2 / SIGMA / ROV_AREA / ROV_DRAG_COEF);
+  //odom_msg_.twist.twist.linear.z = sqrt(thrust_force_z * 2 / SIGMA / ROV_AREA / ROV_DRAG_COEF);
+  //odom_msg_.twist.twist.angular.z = thrust_force_yaw / drag_coef_yaw;
+
+  // Populate position info
+  // TODO calc xy distance moved since last time
+  // geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromRollPitchYaw(0, 0, pose.yaw);
+  // odom_msg_.pose.pose.position.x = pose.x;
+  // odom_msg_.pose.pose.position.y = pose.y;
+  odom_msg_.pose.pose.position.z = depth_state_;
+  // odom_msg_.pose.pose.orientation = quat;
+
+  odom_pub_.publish(odom_msg_);
 }
 
 // Change operation mode

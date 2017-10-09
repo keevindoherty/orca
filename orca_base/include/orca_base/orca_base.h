@@ -3,9 +3,11 @@
 
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
+#include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/Joy.h>
 #include <tf/transform_listener.h>
+
 #include "orca_base/Depth.h"
 
 namespace orca_base {
@@ -26,6 +28,7 @@ private:
   tf::TransformListener &tf_;
 
   Mode mode_;
+  nav_msgs::Odometry odom_msg_;  
 
   // Yaw pid control state
   double yaw_state_;
@@ -75,12 +78,14 @@ private:
   ros::Publisher depth_setpoint_pub_;
   ros::Publisher camera_tilt_pub_;
   ros::Publisher lights_pub_;
+  ros::Publisher odom_pub_;
   
   // Helpers
   void publishYawSetpoint();
   void publishDepthSetpoint();
   void publishCameraTilt();
   void publishLights();
+  void publishOdom();
   void setMode(Mode mode, double depth_setpoint);
   
 public:
