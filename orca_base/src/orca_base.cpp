@@ -3,6 +3,10 @@
 #include "orca_msgs/Camera.h"
 #include "orca_msgs/Lights.h"
 #include "orca_msgs/Thrusters.h"
+// TODO try using OverrideRCIn to pass messages to Mavros
+// - this might be the best way to get desired functionality.
+// - see BlueROV teleop apps for example
+#include <mavros_msgs/OverrideRCIn.h>
 
 // Limits
 // TODO move to shared .h file
