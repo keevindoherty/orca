@@ -1,8 +1,8 @@
 # Orca #
 
-Orca is a [ROS](http://ros.org) driver for [BlueRobotics BlueROV2](https://www.bluerobotics.com/store/rov/bluerov2/). Version 1.0 will support basic ROV functions; subsequent versions will add AUV functions.
+Orca is a [ROS](http://ros.org) driver for [BlueRobotics BlueROV2](https://www.bluerobotics.com/store/rov/bluerov2/). Version 1.0 will support basic ROV functions; subsequent versions will add AUV functions. This repository forks [the original Orca repository](https://www.github.com/clydemcqueen/orca) and seeks to integrate the Pixhawk controller that comes with the BlueROV2.
 
-Orca does not use the Pixhawk controller that comes with the BlueROV2, and does not support [mavros](http://wiki.ros.org/mavros), [ArduSub](https://www.ardusub.com/) or [QGroundControl](http://qgroundcontrol.com/).
+This package doesn't support [QGroundControl](http://qgroundcontrol.com/).
 
 ## Tested Hardware
 
